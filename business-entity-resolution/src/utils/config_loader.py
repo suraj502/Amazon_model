@@ -7,7 +7,20 @@ import yaml
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _CONFIG_PATH = _PROJECT_ROOT / "config" / "config.yaml"
-_REQUIRED_SECTIONS = {"paths", "schema", "normalization", "blocking", "features", "model", "evaluation", "threshold", "submission", "runtime"}
+_REQUIRED_SECTIONS = {
+    "paths",
+    "schema",
+    "normalization",
+    "eda",
+    "blocking",
+    "features",
+    "model",
+    "evaluation",
+    "decision_strategy",
+    "validation_stability",
+    "submission",
+    "runtime",
+}
 
 
 def load_config(config_path: Path | None = None) -> dict[str, Any]:

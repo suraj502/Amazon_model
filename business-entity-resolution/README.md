@@ -4,7 +4,7 @@ A production-style scaffold for matching business records across Source 1, Sourc
 
 ## Project Structure
 
-- `config/`: the single source of truth for paths, schema, strategies, model settings, and submission columns.
+- `config/`: the single source of truth for paths, schema, normalization dictionaries, strategies, model settings, and submission columns.
 - `data/raw/` and `data/processed/`: gitignored input and intermediate data locations.
 - `src/`: package modules organized by pipeline responsibility.
 - `scripts/`: command-line entry points for each stage and the end-to-end runner.
@@ -15,10 +15,10 @@ A production-style scaffold for matching business records across Source 1, Sourc
 
 The four pipeline stages map cleanly to separate team folders:
 
-1. **Normalization:** `src/normalization/` cleans names and addresses and profiles source data.
-2. **Blocking:** `src/blocking/` creates and unions candidate pairs.
+1. **Normalization and EDA:** `src/normalization/` and `scripts/run_eda.py` preserve multi-view values, inspect sources, and create the initial report.
+2. **Blocking:** `src/blocking/` creates, unions, and reports candidate pairs.
 3. **Features and model:** `src/features/` and `src/model/` build candidate features, train, and predict.
-4. **Evaluation and submission:** `src/evaluation/` and `src/submission/` score, select thresholds, validate, and serialize results.
+4. **Evaluation and submission:** `src/evaluation/` and `src/submission/` compare decision strategies, score, validate, and serialize results.
 
 Shared configuration and I/O contracts live in `src/utils/`; changes there should be coordinated across the team.
 
@@ -33,15 +33,22 @@ pip install -r requirements.txt
 
 Place competition TSV files under `data/raw/` using the paths in `config/config.yaml`.
 
-## Run the Pipeline
+## Run Order
 
-The end-to-end entry point calls normalization, blocking, feature construction, training, and evaluation in order:
+EDA must run first and alone so the team can inspect source quality and candidate-count distributions before tuning downstream stages:
+
+```powershell
+python scripts/run_eda.py
+```
+
+After EDA is complete, run the end-to-end entry point. It calls EDA first, followed by normalization, blocking, features, training, and evaluation:
+
 
 ```powershell
 python scripts/run_pipeline.py
 ```
 
-The stage modules are deliberately stubs. Implement each stage against the configured ID and column contracts before running the full pipeline.
+The stage modules are deliberately stubs. Implement each stage against the configured ID and column contracts before running the full pipeline. No country list, row-position matching, or matching/ML behavior is included in this scaffold.
 
 ## Tests
 

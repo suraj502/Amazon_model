@@ -6,7 +6,7 @@ import pandas as pd
 
 from src.utils.config_loader import CONFIG, get_config_value
 
-SEARCH_RANGE = get_config_value(CONFIG, "threshold", "search_range")
+SEARCH_RANGE = get_config_value(CONFIG, "decision_strategy", "global_threshold", "search_range")
 
 
 def find_best_threshold(scores: pd.DataFrame, ground_truth: pd.DataFrame, config: dict[str, Any] = CONFIG) -> float:

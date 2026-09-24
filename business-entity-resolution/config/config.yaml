@@ -31,36 +31,80 @@ schema:
     source3: "S3-"
 
 normalization:
-  lowercase: true
-  strip_punctuation: true
+  keep_multi_view: true          # NEVER overwrite original — always emit all views below
+  name_views: ["name_original", "name_basic_norm", "name_token_norm", "name_alnum_norm", "name_transliterated"]
+  address_views: ["address_original", "address_basic_norm", "address_component_parsed"]
   legal_suffix_dictionary: "config/legal_suffixes.yaml"
+  address_abbreviation_dictionary: "config/address_abbreviations.yaml"
   transliteration_enabled: true
   address_component_parsing: true
 
+eda:
+  run_first: true
+  report_out: "reports/eda_report.md"
+
 blocking:
-  strategies: ["name", "address", "structured"]
-  name_blocking:
-    method: "token_ngram"       # or "phonetic", "minhash_lsh"
-    ngram_size: 3
-    top_k_candidates: 20
-  address_blocking:
-    method: "token_overlap"
-    top_k_candidates: 20
-  structured_blocking:
-    match_on: ["country"]
-  max_candidates_per_entity: 50   # hard cap, protects downstream memory
+  target_recall: 0.95            # minimum acceptable; investigate 0.97-0.99 if feasible
+  max_candidates_per_entity: 50  # hard cap, tune after seeing EDA candidate-count distribution
+  strategies:
+    - name: "exact_name"          # BLOCK A
+      view: "name_alnum_norm"
+      method: "exact"
+    - name: "name_token_overlap"  # BLOCK B
+      view: "name_token_norm"
+      method: "jaccard"
+      top_k: 20
+    - name: "name_char_ngram"      # BLOCK C
+      view: "name_basic_norm"
+      method: "char_ngram"
+      ngram_size: 3
+      top_k: 20
+    - name: "name_phonetic"        # BLOCK D
+      view: "name_transliterated"
+      method: "phonetic"          # soundex / double_metaphone
+      top_k: 20
+    - name: "address_token"        # BLOCK E
+      view: "address_basic_norm"
+      method: "token_overlap"
+      top_k: 20
+    - name: "address_component"    # BLOCK F
+      view: "address_component_parsed"
+      method: "component_match"   # postal / city match
+    - name: "city_plus_name"      # BLOCK G
+      method: "combined"
+      top_k: 20
+    - name: "tfidf_combined"      # BLOCK H
+      method: "tfidf_nn"
+      max_features: 30000
+      top_k: 20
+    - name: "embedding_nn"        # BLOCK I
+      method: "embedding_nn"
+      model_name: "sentence-transformers/all-MiniLM-L6-v2"
+      top_k: 20
+  structured_soft_signal: ["country"]   # never a hard filter — France unseen in train
+  report_per_blocker_recall: true
+  report_out: "reports/blocking_recall_report.md"
 
 features:
   string_similarity: true
   tfidf:
     enabled: true
+    char_ngram: true
+    ngram_range: [2, 4]
     max_features: 30000
+    fit_per_fold: true            # avoid validation leakage
   embedding:
     enabled: true
     model_name: "sentence-transformers/all-MiniLM-L6-v2"
     batch_size: 32
   address_component_overlap: true
   phonetic_match: true
+  relative_features:              # NEW
+    enabled: true
+    fields: ["candidate_rank", "top_score", "score_gap_from_top",
+             "score_gap_from_second", "number_of_candidates",
+             "number_above_0_5", "number_above_0_7"]
+  source_type_feature: true
   dtype: "float32"
 
 model:
@@ -75,16 +119,36 @@ model:
     method: "entity_level_kfold"
     n_folds: 5
     random_seed: 42
+  ablation:
+    enabled: true
+    report_out: "reports/feature_ablation.md"
+  hard_negative_mining:            # NEW
+    enabled: true
+    rounds: 1
+    report_out: "reports/hard_negative_report.md"
 
 evaluation:
   metric: "f0.5"
   average: "macro"
   entity_level: true
+  singleton_aware: true
 
-threshold:
-  search_range: [0.1, 0.9]
-  search_step: 0.02
-  optimize_for: "f0.5"
+decision_strategy:                 # NEW — compare, don't assume
+  candidates: ["global_threshold", "top_score_margin", "entity_adaptive"]
+  global_threshold:
+    search_range: [0.1, 0.9]
+    search_step: 0.02
+  top_score_margin:
+    margin_search_range: [0.02, 0.3]
+  high_precision_rules:
+    enabled: true
+    validate_each_rule: true       # drop any rule that doesn't measurably help on validation
+  report_out: "reports/decision_strategy_report.md"
+
+validation_stability:              # NEW
+  n_seeds: 3
+  track_public_vs_local: true
+  log_out: "reports/leaderboard_tracking.md"
 
 submission:
   validator_script: "src/submission/validate_submission.py"
