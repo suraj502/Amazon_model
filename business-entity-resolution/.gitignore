@@ -1,0 +1,13 @@
+data/raw/*
+!data/raw/.gitkeep
+data/processed/*
+!data/processed/.gitkeep
+output/*.tsv
+__pycache__/
+.pytest_cache/
+*.pyc
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+.venv/
+venv/
+*.egg-info/

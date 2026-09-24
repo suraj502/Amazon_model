@@ -1,0 +1,18 @@
+# Canonical legal suffix groups used by the normalization stage.
+# Extend this data as new source conventions are observed.
+suffix_groups:
+  corporation:
+    - corp
+    - corporation
+    - incorporated
+    - inc
+  limited:
+    - ltd
+    - limited
+    - llc
+  company:
+    - co
+    - company
+  partnership:
+    - llp
+    - lp

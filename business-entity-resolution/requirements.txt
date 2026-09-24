@@ -1,0 +1,10 @@
+pandas
+polars
+pyyaml
+lightgbm
+scikit-learn
+sentence-transformers
+rapidfuzz
+pyarrow
+pytest
+tqdm

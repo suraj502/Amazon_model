@@ -1,0 +1,98 @@
+# config/config.yaml
+# Single source of truth — nothing below should ever be hardcoded in code.
+
+paths:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  candidates_dir: "output"
+  reports_dir: "reports"
+  submission_dir: "output"
+
+  train_source1: "data/raw/train_source1.tsv"
+  train_source2: "data/raw/train_source2.tsv"
+  train_source3: "data/raw/train_source3.tsv"
+  train_ground_truth: "data/raw/train_ground_truth.tsv"
+
+  test_source1: "data/raw/test_source1.tsv"
+  test_source2: "data/raw/test_source2.tsv"
+  test_source3: "data/raw/test_source3.tsv"
+
+  candidate_pairs_out: "output/candidate_pairs.tsv"
+  matching_results_out: "output/matching_results.tsv"
+
+schema:
+  id_column: "entity_id"
+  name_column: "business_name"
+  address_column: "business_address"
+  country_column: "country"
+  source_prefixes:
+    source1: "S1-"
+    source2: "S2-"
+    source3: "S3-"
+
+normalization:
+  lowercase: true
+  strip_punctuation: true
+  legal_suffix_dictionary: "config/legal_suffixes.yaml"
+  transliteration_enabled: true
+  address_component_parsing: true
+
+blocking:
+  strategies: ["name", "address", "structured"]
+  name_blocking:
+    method: "token_ngram"       # or "phonetic", "minhash_lsh"
+    ngram_size: 3
+    top_k_candidates: 20
+  address_blocking:
+    method: "token_overlap"
+    top_k_candidates: 20
+  structured_blocking:
+    match_on: ["country"]
+  max_candidates_per_entity: 50   # hard cap, protects downstream memory
+
+features:
+  string_similarity: true
+  tfidf:
+    enabled: true
+    max_features: 30000
+  embedding:
+    enabled: true
+    model_name: "sentence-transformers/all-MiniLM-L6-v2"
+    batch_size: 32
+  address_component_overlap: true
+  phonetic_match: true
+  dtype: "float32"
+
+model:
+  type: "lightgbm"
+  params:
+    objective: "binary"
+    metric: "auc"
+    num_leaves: 31
+    learning_rate: 0.05
+    n_estimators: 500
+  cv:
+    method: "entity_level_kfold"
+    n_folds: 5
+    random_seed: 42
+
+evaluation:
+  metric: "f0.5"
+  average: "macro"
+  entity_level: true
+
+threshold:
+  search_range: [0.1, 0.9]
+  search_step: 0.02
+  optimize_for: "f0.5"
+
+submission:
+  validator_script: "src/submission/validate_submission.py"
+  output_columns:
+    matching_results: ["source1_entity_id", "matched_entity_ids"]
+    candidate_pairs: ["source1_entity_id", "candidate_entity_ids"]
+
+runtime:
+  low_memory_mode: true
+  chunk_size: 5000
+  n_jobs: 2
