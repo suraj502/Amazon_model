@@ -959,3 +959,287 @@ def block_by_name_token_overlap(
         ],
     )
 
+# ============================================================
+# Block C: Character N-gram Name Blocking
+# ============================================================
+
+@dataclass
+class CharNgramIndex:
+    """Simple target-side index for character n-gram blocking."""
+
+    ngram_to_ids: dict[str, list[str]]
+    id_to_ngrams: dict[str, set[str]]
+
+
+def _build_char_ngrams(
+    text: Any,
+    ngram_size: int = 3,
+) -> set[str]:
+    """Build character n-grams from a normalized name."""
+    if text is None or pd.isna(text):
+        return set()
+
+    text = str(text).strip()
+
+    if not text:
+        return set()
+
+    # Add spaces around the name so word boundaries contribute
+    # to the character representation.
+    text = f" {text} "
+
+    if len(text) < ngram_size:
+        return {text}
+
+    return {
+        text[i : i + ngram_size]
+        for i in range(len(text) - ngram_size + 1)
+    }
+
+
+def build_char_ngram_index(
+    target_df: pd.DataFrame,
+    config: dict[str, Any],
+) -> CharNgramIndex:
+    """
+    Build a simple reusable character n-gram index for Block C.
+    """
+
+    required_columns = {
+        "entity_id",
+        "name_basic_norm",
+    }
+
+    missing = required_columns - set(target_df.columns)
+
+    if missing:
+        raise ValueError(
+            "Target dataframe missing required columns: "
+            f"{sorted(missing)}"
+        )
+
+    strategy = _get_strategy_config(
+        config,
+        "name_char_ngram",
+    )
+
+    ngram_size = int(
+        strategy.get(
+            "ngram_size",
+            3,
+        )
+    )
+
+    ngram_to_ids: dict[str, list[str]] = defaultdict(list)
+    id_to_ngrams: dict[str, set[str]] = {}
+
+    print("\n[Block C] Building character n-gram index...")
+    print(f"  Target rows: {len(target_df):,}")
+    print(f"  N-gram size: {ngram_size}")
+
+    for entity_id, name in zip(
+        target_df["entity_id"],
+        target_df["name_basic_norm"],
+    ):
+        ngrams = _build_char_ngrams(
+            name,
+            ngram_size,
+        )
+
+        if not ngrams:
+            continue
+
+        target_id = str(entity_id)
+
+        id_to_ngrams[target_id] = ngrams
+
+        for ngram in ngrams:
+            ngram_to_ids[ngram].append(target_id)
+
+    print(
+        f"  Unique n-grams: {len(ngram_to_ids):,}"
+    )
+
+    return CharNgramIndex(
+        ngram_to_ids=dict(ngram_to_ids),
+        id_to_ngrams=id_to_ngrams,
+    )
+
+
+def _char_ngram_similarity(
+    source_ngrams: set[str],
+    target_ngrams: set[str],
+) -> float:
+    """Calculate Jaccard similarity between character n-gram sets."""
+    if not source_ngrams or not target_ngrams:
+        return 0.0
+
+    intersection = len(
+        source_ngrams & target_ngrams
+    )
+
+    union = len(
+        source_ngrams | target_ngrams
+    )
+
+    if union == 0:
+        return 0.0
+
+    return intersection / union
+
+
+def generate_char_ngram_candidates(
+    source1_df: pd.DataFrame,
+    index: CharNgramIndex,
+    config: dict[str, Any],
+) -> pd.DataFrame:
+    """
+    Generate Block C character n-gram candidates.
+
+    This simple version is intended for development/testing
+    on the small dev dataset.
+    """
+
+    required_columns = {
+        "entity_id",
+        "name_basic_norm",
+    }
+
+    missing = required_columns - set(source1_df.columns)
+
+    if missing:
+        raise ValueError(
+            "Source1 dataframe missing required columns: "
+            f"{sorted(missing)}"
+        )
+
+    strategy = _get_strategy_config(
+        config,
+        "name_char_ngram",
+    )
+
+    ngram_size = int(
+        strategy.get(
+            "ngram_size",
+            3,
+        )
+    )
+
+    top_k = int(
+        strategy.get(
+            "top_k",
+            20,
+        )
+    )
+
+    all_pairs: list[dict[str, str | float]] = []
+
+    print("\n[Block C] Generating character n-gram candidates...")
+
+    for _, row in source1_df.iterrows():
+
+        source_id = str(
+            row["entity_id"]
+        )
+
+        source_ngrams = _build_char_ngrams(
+            row["name_basic_norm"],
+            ngram_size,
+        )
+
+        if not source_ngrams:
+            continue
+
+        # Find targets sharing at least one n-gram.
+        candidate_ids: set[str] = set()
+
+        for ngram in source_ngrams:
+            candidate_ids.update(
+                index.ngram_to_ids.get(
+                    ngram,
+                    [],
+                )
+            )
+
+        if not candidate_ids:
+            continue
+
+        scored = []
+
+        for target_id in candidate_ids:
+
+            target_ngrams = index.id_to_ngrams.get(
+                target_id
+            )
+
+            if not target_ngrams:
+                continue
+
+            score = _char_ngram_similarity(
+                source_ngrams,
+                target_ngrams,
+            )
+
+            if score <= 0:
+                continue
+
+            scored.append(
+                (
+                    target_id,
+                    score,
+                )
+            )
+
+        # Highest similarity first.
+        scored.sort(
+            key=lambda item: (
+                -item[1],
+                item[0],
+            )
+        )
+
+        for target_id, score in scored[:top_k]:
+            all_pairs.append(
+                {
+                    "source1_entity_id": source_id,
+                    "candidate_entity_id": target_id,
+                    "score": float(score),
+                }
+            )
+
+    print(
+        f"[Block C] Total candidate pairs: "
+        f"{len(all_pairs):,}"
+    )
+
+    return pd.DataFrame(
+        all_pairs,
+        columns=[
+            "source1_entity_id",
+            "candidate_entity_id",
+            "score",
+        ],
+    )
+
+
+def block_by_name_char_ngram(
+    source1_df: pd.DataFrame,
+    target_df: pd.DataFrame,
+    config: dict[str, Any],
+) -> pd.DataFrame:
+    """
+    Compatibility wrapper for Block C.
+
+    Builds the target n-gram index and generates candidates.
+    """
+
+    index = build_char_ngram_index(
+        target_df,
+        config,
+    )
+
+    return generate_char_ngram_candidates(
+        source1_df,
+        index,
+        config,
+    )

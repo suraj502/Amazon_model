@@ -56,11 +56,16 @@ blocking:
       top_k: 20
       max_token_frequency: 100000
       max_scoring_candidates: 100
-    - name: "name_char_ngram"      # BLOCK C
+
+    - name: "name_char_ngram" # Block C
       view: "name_basic_norm"
       method: "char_ngram"
       ngram_size: 3
       top_k: 20
+      max_ngram_frequency: 50000
+      max_query_ngrams: 8
+      max_scoring_candidates: 100
+
     - name: "name_phonetic"        # BLOCK D
       view: "name_transliterated"
       method: "phonetic"          # soundex / double_metaphone
