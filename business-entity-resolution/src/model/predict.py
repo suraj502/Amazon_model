@@ -22,7 +22,7 @@ from src.utils.config_loader import CONFIG
 PREDICTION_COLUMNS = (
     "source1_entity_id",
     "candidate_entity_id",
-    "match_probability",
+    "probability",
 )
 
 
@@ -94,7 +94,7 @@ def predict_matches(
         raise ValueError("Model probabilities must be within [0, 1]")
 
     output = features[list(required_ids)].copy().reset_index(drop=True)
-    output["match_probability"] = probabilities
+    output["probability"] = probabilities
     return output.loc[:, PREDICTION_COLUMNS]
 
 
@@ -111,7 +111,7 @@ def write_predictions(
     if predictions.isna().any().any():
         raise ValueError("Prediction output contains missing values")
     if not np.isfinite(
-        predictions["match_probability"].to_numpy(dtype=np.float32)
+        predictions["probability"].to_numpy(dtype=np.float32)
     ).all():
         raise ValueError("Prediction probabilities contain NaN or infinity")
     destination = Path(path)

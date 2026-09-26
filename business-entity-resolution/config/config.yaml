@@ -142,6 +142,10 @@ evaluation:
 
 decision_strategy:                 # NEW — compare, don't assume
   candidates: ["global_threshold", "top_score_margin", "entity_adaptive"]
+  selected:
+    strategy: "global_threshold"
+    threshold: 0.25
+    margin: 0.1
   global_threshold:
     search_range: [0.1, 0.9]
     search_step: 0.02

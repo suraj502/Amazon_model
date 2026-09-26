@@ -3,6 +3,7 @@
 from typing import Any
 import re
 import unicodedata
+from pathlib import Path
 
 import pandas as pd
 
@@ -67,7 +68,10 @@ def _load_legal_suffixes(suffix_path: str) -> set[str]:
         return _LEGAL_SUFFIX_CACHE[suffix_path]
     try:
         import yaml
-        with open(suffix_path, 'r', encoding='utf-8') as handle:
+        path = Path(suffix_path)
+        if not path.is_absolute():
+            path = Path(__file__).resolve().parents[2] / path
+        with path.open("r", encoding="utf-8") as handle:
             data = yaml.safe_load(handle) or {}
         suffixes: set[str] = set()
         for values in data.get('suffix_groups', {}).values():

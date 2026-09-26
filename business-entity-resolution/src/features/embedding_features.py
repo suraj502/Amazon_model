@@ -6,7 +6,11 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sentence_transformers import SentenceTransformer
+
+try:
+    from sentence_transformers import SentenceTransformer
+except ImportError:
+    SentenceTransformer = None
 
 from src.utils.config_loader import CONFIG, get_config_value
 
@@ -24,6 +28,10 @@ def load_embedding_model(
 ) -> SentenceTransformer:
     """Load the configured model; CPU is the safe default and needs no GPU."""
     settings = get_config_value(config, "features", "embedding")
+    if SentenceTransformer is None:
+        raise ImportError(
+            "sentence-transformers is required when embedding features are enabled"
+        )
     model_name = settings.get("model_name", "sentence-transformers/all-MiniLM-L6-v2")
     device = settings.get("device", "cpu")
     key = (model_name, device)

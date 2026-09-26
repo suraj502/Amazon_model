@@ -1030,6 +1030,7 @@ def build_char_ngram_index(
         )
     )
 
+    max_ngram_frequency = int(strategy.get("max_ngram_frequency", 50000))
     ngram_to_ids: dict[str, list[str]] = defaultdict(list)
     id_to_ngrams: dict[str, set[str]] = {}
 
@@ -1056,9 +1057,17 @@ def build_char_ngram_index(
         for ngram in ngrams:
             ngram_to_ids[ngram].append(target_id)
 
-    print(
-        f"  Unique n-grams: {len(ngram_to_ids):,}"
+    ngram_to_ids = defaultdict(
+        list,
+        {
+            ngram: ids
+            for ngram, ids in ngram_to_ids.items()
+            if len(ids) <= max_ngram_frequency
+        },
     )
+
+    print(f"  Unique n-grams: {len(ngram_to_ids):,}")
+    print(f"  Max n-gram frequency: {max_ngram_frequency:,}")
 
     return CharNgramIndex(
         ngram_to_ids=dict(ngram_to_ids),
@@ -1131,6 +1140,8 @@ def generate_char_ngram_candidates(
             20,
         )
     )
+    max_query_ngrams = int(strategy.get("max_query_ngrams", 8))
+    max_scoring_candidates = int(strategy.get("max_scoring_candidates", 100))
 
     all_pairs: list[dict[str, str | float]] = []
 
@@ -1150,16 +1161,17 @@ def generate_char_ngram_candidates(
         if not source_ngrams:
             continue
 
-        # Find targets sharing at least one n-gram.
-        candidate_ids: set[str] = set()
-
-        for ngram in source_ngrams:
-            candidate_ids.update(
-                index.ngram_to_ids.get(
-                    ngram,
-                    [],
-                )
-            )
+        query_ngrams = sorted(
+            source_ngrams,
+            key=lambda ngram: (len(index.ngram_to_ids.get(ngram, [])), ngram),
+        )[:max_query_ngrams]
+        candidate_counts: Counter[str] = Counter()
+        for ngram in query_ngrams:
+            candidate_counts.update(index.ngram_to_ids.get(ngram, []))
+        candidate_ids = {
+            target_id
+            for target_id, _ in candidate_counts.most_common(max_scoring_candidates)
+        }
 
         if not candidate_ids:
             continue

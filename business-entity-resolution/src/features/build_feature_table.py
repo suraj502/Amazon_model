@@ -186,14 +186,10 @@ def enrich_candidate_pairs(
         if not subset_mask.any():
             continue
         target_view = _normalized_records(source_records, "s2", config)
-        subset = frame.loc[subset_mask].merge(
-            target_view,
-            left_on="candidate_entity_id",
-            right_on="entity_id",
-            how="left",
-            validate="many_to_one",
-            sort=False,
-        ).drop(columns="entity_id")
+        target_lookup = target_view.set_index("entity_id")
+        subset = target_lookup.reindex(
+            frame.loc[subset_mask, "candidate_entity_id"].to_numpy()
+        )
         for column in target_view.columns:
             if column != "entity_id":
                 frame.loc[subset_mask, column] = subset[column].to_numpy()
@@ -251,7 +247,7 @@ def attach_labels(
         else:
             matched = {
                 item.strip()
-                for item in str(value).split("|")
+                for item in str(value).replace("|", ",").split(",")
                 if item.strip()
             }
         if source_id in truth:
