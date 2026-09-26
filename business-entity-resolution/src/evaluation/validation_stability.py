@@ -24,9 +24,19 @@ def track_validation_stability(results: pd.DataFrame, config: dict[str, Any] = C
         missing = required - set(results.columns)
         if missing:
             raise ValueError(f"Stability results missing columns: {sorted(missing)}")
+        if "seed" in results.columns:
+            group_columns = ["strategy", "seed"]
+            best_indices = results.groupby(group_columns)["f05"].idxmax()
+            results = results.loc[best_indices].copy()
         summary = (
-            results.groupby("strategy", as_index=False)["f05"]
-            .agg(mean_f05="mean", std_f05="std", min_f05="min", max_f05="max", n_seeds="count")
+            results.groupby("strategy", as_index=False)
+            .agg(
+                mean_f05=("f05", "mean"),
+                std_f05=("f05", "std"),
+                min_f05=("f05", "min"),
+                max_f05=("f05", "max"),
+                n_seeds=("seed" if "seed" in results.columns else "f05", "nunique" if "seed" in results.columns else "count"),
+            )
         )
         summary["std_f05"] = summary["std_f05"].fillna(0.0)
 
