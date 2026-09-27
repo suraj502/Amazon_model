@@ -1,0 +1,49 @@
+﻿# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Competition data
+dataset/
+data/raw/
+data/processed/
+*.tsv
+*.csv
+*.parquet
+
+# Generated outputs
+output/
+reports/
+*.zip
+
+# Model artifacts
+models/
+*.joblib
+*.pkl
+*.pickle
+*.pt
+*.pth
+*.onnx
+
+# Local configuration/secrets
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# Temporary files
+*.log
+tmp/
+temp/
+
+# Backup
+business-entity-resolution_backup/

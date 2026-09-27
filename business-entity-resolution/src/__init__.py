@@ -1,1 +1,1 @@
-"""Business entity resolution package scaffold."""
+"""Amazon ML Challenge 2026: Business Entity Resolution Package."""
